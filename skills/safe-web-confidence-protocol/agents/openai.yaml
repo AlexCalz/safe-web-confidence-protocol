@@ -1,0 +1,4 @@
+interface:
+  display_name: "Safe Web Gate"
+  short_description: "Pre-browse URL reputation protocol"
+  default_prompt: "Use $safe-web-confidence-protocol to assess a URL with reputation APIs before opening it."

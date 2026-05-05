@@ -1,0 +1,5 @@
+# One host or suffix rule per line.
+# A rule matches the exact host and any subdomain beneath it.
+# Examples:
+# trusted.example.com
+# example.org
