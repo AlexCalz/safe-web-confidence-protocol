@@ -15,27 +15,50 @@ Most agents browse too optimistically. This protocol forces a URL through a loca
 - computes a normalized score and verdict: `allow`, `sandbox-only`, or `block`
 - provides a Mermaid protocol diagram and a documented scoring model
 
-## Architecture
+## Protocol Flow
 
 ```mermaid
-flowchart LR
-    A["Candidate URL"] --> B{"Local policy match?"}
+flowchart TD
+    A["Candidate URL arrives"] --> B{"Allowlist or blocklist match?"}
     B -->|Allowlist| C["Return allow immediately"]
     B -->|Blocklist| D["Return block immediately"]
-    B -->|No match| E["Query reputation sources"]
-    E --> F["Apply weighted scoring model"]
-    F --> G{"Verdict"}
-    G -->|allow| H["Open exact assessed URL"]
-    G -->|sandbox-only| I["Restricted investigation only"]
-    G -->|block| J["Do not browse"]
+    B -->|No match| E["Canonicalize URL and registrable domain"]
+    E --> F["Query VirusTotal"]
+    F --> G{"More evidence needed?"}
+    G -->|Yes| H["Query one or more: urlscan, Safe Browsing, OpenPhish, OTX"]
+    G -->|No| I["Assemble available evidence"]
+    H --> I
+    I --> J["Run url_confidence_score.py"]
+    J --> K{"Verdict?"}
+    K -->|allow| L["Open exact assessed URL"]
+    K -->|sandbox-only| M["Open only in restricted investigation mode"]
+    K -->|block| N["Do not browse; report evidence"]
+    L --> O["Monitor redirects and re-check on host change"]
+    M --> O
+    N --> P["Wait for explicit user override"]
+    O --> Q["Summarize score, sources, and rationale"]
+    P --> Q
 ```
 
-Decision path:
+This is the actual browse gate. The browser should not touch an unfamiliar site until the URL has moved through this pipeline.
 
-- local allowlist and blocklist are checked first to save compute
-- unmatched hosts are evaluated with external intelligence
-- the scorer returns `allow`, `sandbox-only`, or `block`
-- redirects or host changes should trigger re-evaluation
+## Safety Scans Used
+
+- `allowlist.txt`: short-circuits known-good hosts and subdomains without spending API calls
+- `blocklist.txt`: hard-denies known-bad hosts and subdomains before any browsing can happen
+- `VirusTotal`: primary aggregation layer for malware, phishing, suspicious, and benign vendor results
+- `urlscan.io`: captures render context, redirect behavior, final host changes, and suspicious page history
+- `Google Safe Browsing`: strong malware and social-engineering signal with high weight in the final verdict
+- `OpenPhish`: phishing-focused intelligence source for fast confirmation on known lure infrastructure
+- `AlienVault OTX`: pulse-based threat-intel context when a URL or domain has prior sightings
+
+## Decision Logic
+
+- local allow and deny rules are checked first to save compute and enforce personal policy
+- VirusTotal is the first external scan because it provides the broadest vendor coverage
+- additional scans are layered in when the host is unknown, login-themed, suspicious, or already flagged
+- the scorer converts all signals into an explainable `allow`, `sandbox-only`, or `block` verdict
+- any redirect or host change should be treated as a new target and re-scanned
 
 ## Repo layout
 
