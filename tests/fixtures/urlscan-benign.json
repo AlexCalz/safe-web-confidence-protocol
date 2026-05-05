@@ -1,0 +1,15 @@
+{
+  "results": [
+    {
+      "page": {
+        "url": "https://example.com/"
+      },
+      "verdicts": {
+        "overall": {
+          "malicious": false,
+          "score": 10
+        }
+      }
+    }
+  ]
+}

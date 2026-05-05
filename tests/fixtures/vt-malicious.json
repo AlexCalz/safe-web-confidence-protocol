@@ -1,0 +1,12 @@
+{
+  "data": {
+    "attributes": {
+      "last_analysis_stats": {
+        "malicious": 8,
+        "suspicious": 2,
+        "harmless": 5,
+        "undetected": 8
+      }
+    }
+  }
+}
