@@ -18,26 +18,44 @@ Most agents browse too optimistically. This protocol forces a URL through a loca
 ## Protocol Flow
 
 ```mermaid
-flowchart TD
-    A["Candidate URL arrives"] --> B{"Allowlist or blocklist match?"}
-    B -->|Allowlist| C["Return allow immediately"]
-    B -->|Blocklist| D["Return block immediately"]
-    B -->|No match| E["Canonicalize URL and registrable domain"]
-    E --> F["Query VirusTotal"]
-    F --> G{"More evidence needed?"}
-    G -->|Yes| H["Query one or more: urlscan, Safe Browsing, OpenPhish, OTX"]
-    G -->|No| I["Assemble available evidence"]
-    H --> I
-    I --> J["Run url_confidence_score.py"]
-    J --> K{"Verdict?"}
-    K -->|allow| L["Open exact assessed URL"]
-    K -->|sandbox-only| M["Open only in restricted investigation mode"]
-    K -->|block| N["Do not browse; report evidence"]
-    L --> O["Monitor redirects and re-check on host change"]
-    M --> O
-    N --> P["Wait for explicit user override"]
-    O --> Q["Summarize score, sources, and rationale"]
-    P --> Q
+flowchart LR
+    A["Candidate URL"] --> B{"Local policy?"}
+    B -->|Allowlist| C["allow = 100"]
+    B -->|Blocklist| D["block = 0"]
+    B -->|No match| E["Canonicalize URL and host"]
+    E --> F["VirusTotal
+    +15 clean broad scan
+    -30 material malicious
+    -45 high malicious ratio
+    -15 suspicious ratio"]
+    F --> G{"Need more evidence?"}
+    G -->|Yes| H["urlscan
+    +10 benign same host
+    -20 redirect host change
+    -30 malicious verdict"]
+    G -->|Yes| I["Safe Browsing
+    -40 threat match"]
+    G -->|Yes| J["OpenPhish
+    -35 phishing hit"]
+    G -->|Yes| K["OTX
+    -15 pulse hit"]
+    G -->|No| L["Use available evidence"]
+    H --> M["Aggregate weighted signals"]
+    I --> M
+    J --> M
+    K --> M
+    L --> M
+    M --> N["Host heuristics
+    -10 punycode or IP-style host
+    -10 login or verification path
+    +20 explicit trusted domain"]
+    N --> O{"Score 0-100"}
+    O -->|80-100| P["allow"]
+    O -->|50-79| Q["sandbox-only"]
+    O -->|0-49| R["block"]
+    P --> S["Open exact assessed URL"]
+    Q --> T["Restricted investigation only"]
+    R --> U["Do not browse"]
 ```
 
 This is the actual browse gate. The browser should not touch an unfamiliar site until the URL has moved through this pipeline.
@@ -59,6 +77,15 @@ This is the actual browse gate. The browser should not touch an unfamiliar site 
 - additional scans are layered in when the host is unknown, login-themed, suspicious, or already flagged
 - the scorer converts all signals into an explainable `allow`, `sandbox-only`, or `block` verdict
 - any redirect or host change should be treated as a new target and re-scanned
+
+Weight summary:
+
+- `VirusTotal`: `+15`, `-15`, `-30`, `-45`
+- `urlscan`: `+10`, `-20`, `-30`
+- `Google Safe Browsing`: `-40`
+- `OpenPhish`: `-35`
+- `OTX`: `-15`
+- host heuristics: `-10`, `-10`, `+20`
 
 ## Repo layout
 
